@@ -31,7 +31,7 @@
   
   <chapter id="object-tree">
     <title>Object Hierarchy</title>
-    <xi:include href="xml/tree_index.sgml"/>
+    <xi:include href="xml/object_index.sgml"/>
   </chapter>
   
   <index id="api-index-full">
