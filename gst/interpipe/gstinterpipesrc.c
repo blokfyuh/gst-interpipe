@@ -158,6 +158,8 @@ struct _GstInterPipeSrc
 
   /* Compensate timestamps monotonically */
   gboolean compensate_ts_monotonically;
+
+  GstBuffer *last_buffer;
 };
 
 struct _GstInterPipeSrcClass
@@ -255,6 +257,7 @@ gst_inter_pipe_src_init (GstInterPipeSrc * src)
   src->accept_events = TRUE;
   src->accept_eos_event = TRUE;
   src->compensate_ts_monotonically = FALSE;
+  src->last_buffer = NULL;
 }
 
 static void
@@ -388,6 +391,11 @@ gst_inter_pipe_src_finalize (GObject * object)
   if (src->listen_to) {
     g_free (src->listen_to);
     src->listen_to = NULL;
+  }
+
+  if (src->last_buffer) {
+    gst_buffer_unref (src->last_buffer);
+    src->last_buffer = NULL;
   }
 
   /* Chain up to the parent class */
@@ -700,10 +708,46 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
         "Calculated Buffer Timestamp (PTS): %" GST_TIME_FORMAT,
         GST_TIME_ARGS (GST_BUFFER_PTS (buffer)));
 
-    GST_LOG_OBJECT (src, "Compensate-ts-monotonically value: %s",
-        src->compensate_ts_monotonically ? "TRUE" : "FALSE");
     if (src->compensate_ts_monotonically) {
       GST_LOG_OBJECT (src, "Compensating TS monotonically...");
+      if (src->last_buffer) {
+        gst_buffer_unref (src->last_buffer);
+      }
+      src->last_buffer = gst_buffer_ref (buffer);
+
+      if (src->last_buffer) {
+        if (GST_BUFFER_PTS (buffer) <= GST_BUFFER_PTS (src->last_buffer)) {
+          GST_LOG_OBJECT (src,
+              "Compensating Buffer Timestamp (PTS) to match last Buffer Timestamp: %"
+              GST_TIME_FORMAT,
+              GST_TIME_ARGS (GST_BUFFER_PTS (src->last_buffer)));
+          buffer = gst_buffer_make_writable (buffer);
+          GST_BUFFER_PTS (buffer) =
+              GST_BUFFER_PTS (src->last_buffer) + GST_BUFFER_DURATION (buffer);
+          if ((GST_BUFFER_DTS (src->last_buffer) +
+                  GST_BUFFER_DURATION (buffer)) < GST_CLOCK_TIME_NONE) {
+            GST_BUFFER_DTS (buffer) =
+                GST_BUFFER_DTS (src->last_buffer) +
+                GST_BUFFER_DURATION (buffer);
+          }
+        } else if (GST_BUFFER_PTS (buffer) >
+            (GST_BUFFER_PTS (src->last_buffer) +
+                2 * GST_BUFFER_DURATION (buffer))) {
+          GST_LOG_OBJECT (src,
+              "Compensating Buffer Timestamp (PTS) to match last Buffer Timestamp: %"
+              GST_TIME_FORMAT,
+              GST_TIME_ARGS (GST_BUFFER_PTS (src->last_buffer)));
+          buffer = gst_buffer_make_writable (buffer);
+          GST_BUFFER_PTS (buffer) =
+              GST_BUFFER_PTS (src->last_buffer) + GST_BUFFER_DURATION (buffer);
+          if ((GST_BUFFER_DTS (src->last_buffer) +
+                  GST_BUFFER_DURATION (buffer)) < GST_CLOCK_TIME_NONE) {
+            GST_BUFFER_DTS (buffer) =
+                GST_BUFFER_DTS (src->last_buffer) +
+                GST_BUFFER_DURATION (buffer);
+          }
+        }
+      }
     }
 
   } else if (GST_INTER_PIPE_SRC_RESTART_TIMESTAMP == src->stream_sync) {
