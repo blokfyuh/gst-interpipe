@@ -700,6 +700,8 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
         "Calculated Buffer Timestamp (PTS): %" GST_TIME_FORMAT,
         GST_TIME_ARGS (GST_BUFFER_PTS (buffer)));
 
+    GST_LOG_OBJECT (src, "Compensate-ts-monotonically value: %s",
+        src->compensate_ts_monotonically ? "TRUE" : "FALSE");
     if (src->compensate_ts_monotonically) {
       GST_LOG_OBJECT (src, "Compensating TS monotonically...");
     }
