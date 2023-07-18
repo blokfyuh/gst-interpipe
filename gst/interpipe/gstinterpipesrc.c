@@ -654,6 +654,8 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
         GST_TIME_ARGS (srcbasetime));
     GST_LOG_OBJECT (src, "Node Base Time: %" GST_TIME_FORMAT,
         GST_TIME_ARGS (basetime));
+    GST_LOG_OBJECT (src, "ZOUBI TEST: %" GST_TIME_FORMAT,
+        GST_TIME_ARGS (basetime));
 
     if (GST_STATE (src) == GST_STATE_PLAYING) {
       if (srcbasetime > basetime) {
