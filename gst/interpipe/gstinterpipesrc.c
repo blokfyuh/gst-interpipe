@@ -60,7 +60,8 @@ enum
   PROP_ALLOW_RENEGOTIATION,
   PROP_STREAM_SYNC,
   PROP_ACCEPT_EVENTS,
-  PROP_ACCEPT_EOS_EVENT
+  PROP_ACCEPT_EOS_EVENT,
+  PROP_COMPENSATE_TS_MONOTONICALLY
 };
 
 static void gst_inter_pipe_src_set_property (GObject * object, guint prop_id,
@@ -154,6 +155,9 @@ struct _GstInterPipeSrc
 
   /* Accept end of stream event */
   gboolean accept_eos_event;
+
+  /* Compensate timestamps monotonically */
+  gboolean compensate_ts_monotonically;
 };
 
 struct _GstInterPipeSrcClass
@@ -222,6 +226,14 @@ gst_inter_pipe_src_class_init (GstInterPipeSrcClass * klass)
           "Accept the EOS event received from the interpipesink only if it "
           "is set to true", TRUE, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class,
+      PROP_COMPENSATE_TS_MONOTONICALLY,
+      g_param_spec_boolean ("compensate-ts-monotically",
+          "Stream synchronization compensate-ts but monotonically ",
+          "Stream synchronization compensate-ts but monotonically to prevent backwards "
+          "PTS/DTS when switching between multiple nodes", FALSE,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   basesrc_class->start = GST_DEBUG_FUNCPTR (gst_inter_pipe_src_start);
   basesrc_class->stop = GST_DEBUG_FUNCPTR (gst_inter_pipe_src_stop);
   basesrc_class->event = GST_DEBUG_FUNCPTR (gst_inter_pipe_src_event);
@@ -242,6 +254,7 @@ gst_inter_pipe_src_init (GstInterPipeSrc * src)
   src->stream_sync = GST_INTER_PIPE_SRC_PASSTHROUGH_TIMESTAMP;
   src->accept_events = TRUE;
   src->accept_eos_event = TRUE;
+  src->compensate_ts_monotonically = FALSE;
 }
 
 static void
@@ -314,6 +327,9 @@ gst_inter_pipe_src_set_property (GObject * object, guint prop_id,
     case PROP_ACCEPT_EOS_EVENT:
       src->accept_eos_event = g_value_get_boolean (value);
       break;
+    case PROP_COMPENSATE_TS_MONOTONICALLY:
+      src->compensate_ts_monotonically = g_value_get_boolean (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -348,6 +364,9 @@ gst_inter_pipe_src_get_property (GObject * object, guint prop_id,
       break;
     case PROP_ACCEPT_EOS_EVENT:
       g_value_set_boolean (value, src->accept_eos_event);
+      break;
+    case PROP_COMPENSATE_TS_MONOTONICALLY:
+      g_value_set_boolean (value, src->compensate_ts_monotonically);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -654,8 +673,6 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
         GST_TIME_ARGS (srcbasetime));
     GST_LOG_OBJECT (src, "Node Base Time: %" GST_TIME_FORMAT,
         GST_TIME_ARGS (basetime));
-    GST_LOG_OBJECT (src, "ZOUBI TEST: %" GST_TIME_FORMAT,
-        GST_TIME_ARGS (basetime));
 
     if (GST_STATE (src) == GST_STATE_PLAYING) {
       if (srcbasetime > basetime) {
@@ -682,6 +699,13 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
     GST_LOG_OBJECT (src,
         "Calculated Buffer Timestamp (PTS): %" GST_TIME_FORMAT,
         GST_TIME_ARGS (GST_BUFFER_PTS (buffer)));
+
+    if (src->compensate_ts_monotonically) {
+      GST_LOG_OBJECT (src,
+          "Compensating TS monotonically...",
+          GST_TIME_ARGS (GST_BUFFER_PTS (buffer)));
+    }
+
   } else if (GST_INTER_PIPE_SRC_RESTART_TIMESTAMP == src->stream_sync) {
     /* Remove the incoming timestamp to be generated according this basetime */
     buffer = gst_buffer_make_writable (buffer);
