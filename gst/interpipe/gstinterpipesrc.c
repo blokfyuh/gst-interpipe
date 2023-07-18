@@ -228,7 +228,7 @@ gst_inter_pipe_src_class_init (GstInterPipeSrcClass * klass)
 
   g_object_class_install_property (gobject_class,
       PROP_COMPENSATE_TS_MONOTONICALLY,
-      g_param_spec_boolean ("compensate-ts-monotically",
+      g_param_spec_boolean ("compensate-ts-monotonically",
           "Stream synchronization compensate-ts but monotonically ",
           "Stream synchronization compensate-ts but monotonically to prevent backwards "
           "PTS/DTS when switching between multiple nodes", FALSE,
@@ -701,9 +701,7 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
         GST_TIME_ARGS (GST_BUFFER_PTS (buffer)));
 
     if (src->compensate_ts_monotonically) {
-      GST_LOG_OBJECT (src,
-          "Compensating TS monotonically...",
-          GST_TIME_ARGS (GST_BUFFER_PTS (buffer)));
+      GST_LOG_OBJECT (src, "Compensating TS monotonically...");
     }
 
   } else if (GST_INTER_PIPE_SRC_RESTART_TIMESTAMP == src->stream_sync) {
