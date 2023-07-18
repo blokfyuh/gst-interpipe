@@ -710,10 +710,6 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
 
     if (src->compensate_ts_monotonically) {
       GST_LOG_OBJECT (src, "Compensating TS monotonically...");
-      if (src->last_buffer) {
-        gst_buffer_unref (src->last_buffer);
-      }
-      src->last_buffer = gst_buffer_ref (buffer);
 
       if (src->last_buffer) {
         if (GST_BUFFER_PTS (buffer) <= GST_BUFFER_PTS (src->last_buffer)) {
@@ -748,6 +744,11 @@ gst_inter_pipe_src_push_buffer (GstInterPipeIListener * iface,
           }
         }
       }
+
+      if (src->last_buffer) {
+        gst_buffer_unref (src->last_buffer);
+      }
+      src->last_buffer = gst_buffer_ref (buffer);
     }
 
   } else if (GST_INTER_PIPE_SRC_RESTART_TIMESTAMP == src->stream_sync) {
